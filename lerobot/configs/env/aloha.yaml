@@ -4,7 +4,8 @@ fps: 50
 
 env:
   name: aloha
-  task: AlohaInsertion-v0
+#  task: AlohaInsertion-v0
+  task: AlohaTransferCube-v0
   state_dim: 14
   action_dim: 14
   fps: ${fps}
