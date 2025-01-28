@@ -5,7 +5,7 @@
 #       https://github.com/huggingface/lerobot/pull/134 for more details.
 
 seed: 100000
-dataset_repo_id: lerobot/aloha_sim_transfer_cube_human
+dataset_repo_id: lerobot/aloha_sim_insertion_human
 
 #override_dataset_stats:
 #  # TODO(rcadene, alexander-soare): should we remove image stats as well? do we use a pretrained vision model?
@@ -14,7 +14,6 @@ dataset_repo_id: lerobot/aloha_sim_transfer_cube_human
 #    std: [[[0.2013]], [[0.1992]], [[0.1992]]]  # (c,1,1)
 #  # TODO(rcadene, alexander-soare): we override state and action stats to use the same as the pretrained model
 #  # from the original codebase, but we should remove these and train our own pretrained model
-
 #  observation.state:
 #    min: [-0.0741, -0.9600,  0.6854, -0.2194, -0.8237, -0.3382,  0.0000, -0.3404,
 #        -1.0634,  0.4588, -1.4444, -1.0057, -1.3615,  0.0000]
@@ -62,7 +61,7 @@ policy:
   # Input / output structure.
   n_obs_steps: 2
   horizon: 96
-  n_action_steps: 95
+  n_action_steps: 1
 
   input_shapes:
     # TODO(rcadene, alexander-soare): add variables for height and width from the dataset/env?
