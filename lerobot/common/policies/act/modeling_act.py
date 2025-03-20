@@ -465,11 +465,12 @@ class ACT(nn.Module):
             # When not using the VAE encoder, we set the latent to be all zeros.
             mu = log_sigma_x2 = None
             # TODO(rcadene, alexander-soare): remove call to `.to` to speedup forward ; precompute and use buffer
-            latent_sample = torch.zeros([batch_size, self.config.latent_dim], dtype=torch.float32).to(
+            latent_sample = torch.zeros([batch_size, self.config.latent_dim]).to(
                 batch["observation.state"].device
             )
 
         # Prepare transformer encoder inputs.
+        latent_sample = latent_sample.to(dtype=batch["observation.state"].dtype)
         encoder_in_tokens = [self.encoder_latent_input_proj(latent_sample)]
         encoder_in_pos_embed = list(self.encoder_1d_feature_pos_embed.weight.unsqueeze(1))
         # Robot state token.

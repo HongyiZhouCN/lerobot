@@ -493,7 +493,7 @@ class PI0FlowMatching(nn.Module):
             mean=0.0,
             std=1.0,
             size=shape,
-            dtype=torch.float32,
+            dtype=torch.bfloat16,
             device=device,
         )
         return noise
@@ -501,7 +501,7 @@ class PI0FlowMatching(nn.Module):
     def sample_time(self, bsize, device):
         time_beta = sample_beta(1.5, 1.0, bsize, device)
         time = time_beta * 0.999 + 0.001
-        return time.to(dtype=torch.float32, device=device)
+        return time.to(dtype=torch.bfloat16, device=device)
 
     def embed_prefix(
         self, images, img_masks, lang_tokens, lang_masks
@@ -727,6 +727,6 @@ class PI0FlowMatching(nn.Module):
         )
         suffix_out = outputs_embeds[1]
         suffix_out = suffix_out[:, -self.config.n_action_steps :]
-        suffix_out = suffix_out.to(dtype=torch.float32)
+        suffix_out = suffix_out.to(dtype=torch.bfloat16)
         v_t = self.action_out_proj(suffix_out)
         return v_t

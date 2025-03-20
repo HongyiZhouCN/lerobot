@@ -1,10 +1,5 @@
 from pathlib import Path
 
-# import gym_pusht  # noqa: F401
-
-import gym_pusht  # noqa: F401
-import gym_aloha
-import gymnasium as gym
 import imageio
 import numpy
 import torch
@@ -14,6 +9,14 @@ from lerobot.common.policies.diffusion.modeling_diffusion import DiffusionPolicy
 
 import lerobot.configs.types as types
 
+from tqdm import tqdm
+
+from torch.cuda import Event
+
+import os
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
 device = "cuda"
 policy = PI0Policy.from_pretrained("lerobot/pi0")
 
@@ -21,68 +24,31 @@ pretrained_diffusion_path = "lerobot/diffusion_pusht"
 
 diff_policy = DiffusionPolicy.from_pretrained(pretrained_diffusion_path)
 
-# Initialize evaluation environment to render two observation types:
-# an image of the scene and state/position of the agent. The environment
-# also automatically stops running after 300 interactions/steps.
-env = gym.make(
-    "gym_aloha/AlohaTransferCube-v0",
-    obs_type="pixels_agent_pos",
-    max_episode_steps=300,
-)
-# env = gym.make(
-#     "gym_pusht/PushT-v0",
-#     obs_type="pixels_agent_pos",
-#     max_episode_steps=300,
-# )
-# We can verify that the shapes of the features expected by the policy match the ones from the observations
-# produced by the environment
 policy.config.input_features = diff_policy.config.input_features
-policy.config.input_features['observation.image'].shape = (3, 480, 640)
+policy.config.input_features['observation.image'].shape = (3, 224, 224)
 policy.config.input_features['observation.state'].shape = (14,)
 policy.config.output_features = diff_policy.config.output_features
 print(policy.config.input_features)
-print(env.observation_space)
 
-# Similarly, we can check that the actions produced by the policy will match the actions expected by the
-# environment
 policy.config.output_features['action'].shape = (14,)
 print(policy.config.output_features)
-print(env.action_space)
 
 # Reset the policy and environments to prepare for rollout
 policy.reset()
-numpy_observation, info = env.reset(seed=42)
 
-# Prepare to collect every rewards and all the frames of the episode,
-# from initial state to final state.
-rewards = []
-frames = []
 
-# Render frame of the initial state
-frames.append(env.render())
 
-step = 0
-done = False
-while not done:
-    # Prepare observation for the policy running in Pytorch
-    state = torch.from_numpy(numpy_observation["agent_pos"])
-    image = torch.from_numpy(numpy_observation["pixels"]["top"])
+test_states = numpy.random.random((1000, 14))
+test_states = torch.from_numpy(test_states).to(dtype=torch.float32, device=device, non_blocking=True)
 
-    # Convert to float32 with image from channel first in [0,255]
-    # to channel last in [0,1]
-    state = state.to(torch.float32)
-    image = image.to(torch.float32) / 255
-    image = image.permute(2, 0, 1)
+test_images = numpy.random.random((1000, 3, 224, 224))
+test_images = torch.from_numpy(test_images).to(dtype=torch.float32, device=device, non_blocking=True)
 
-    # Send data tensors from CPU to GPU
-    state = state.to(device, non_blocking=True)
-    image = image.to(device, non_blocking=True)
-
-    # Add extra (empty) batch dimension, required to forward the policy
-    state = state.unsqueeze(0)
-    image = image.unsqueeze(0)
-
+for j in tqdm(range(50)):
     # Create the policy input dictionary
+    state = test_states[j].unsqueeze(0)
+    image = test_images[j].unsqueeze(0)
+
     observation = {
         "observation.state": state,
         "observation.image": image,
@@ -92,10 +58,47 @@ while not done:
     # Predict the next action with respect to the current observation
     with torch.inference_mode():
         action = policy.select_action(observation)
+    
 
-    # Prepare the action for the environment
-    numpy_action = action.squeeze(0).to("cpu").numpy()
+# Create CUDA events
+start_event = Event(enable_timing=True)
+end_event = Event(enable_timing=True)
+    
+# Measure time for multiple runs
+total_time = 0.0
 
-    # Step through the environment and receive a new observation
-    numpy_observation, reward, terminated, truncated, info = env.step(numpy_action)
-    print(f"{step=} {reward=} {terminated=}")
+times = []
+
+for i in tqdm(range(1000)):
+    # Add extra (empty) batch dimension, required to forward the policy
+    state = test_states[i].unsqueeze(0)
+    image = test_images[i].unsqueeze(0)
+
+
+    # Create the policy input dictionary
+    observation = {
+        "observation.state": state,
+        "observation.image": image,
+        "task": ["push_t"],
+    }
+
+    start_event.record()
+
+    # Predict the next action with respect to the current observation
+    with torch.inference_mode():
+        action = policy.select_action(observation)
+    
+    end_event.record()
+    end_event.synchronize()
+    times.append(start_event.elapsed_time(end_event))
+
+times = numpy.array(times)
+avg_time = numpy.mean(times)
+std_time = numpy.std(times)
+
+print("average time: ", avg_time)
+print("std time: ", std_time)
+
+
+if __name__ == "__main__":
+    pass
